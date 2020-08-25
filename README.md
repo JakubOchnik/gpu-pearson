@@ -1,1 +1,1 @@
-# gpu-pearson
+# GPU-accelerated Pearson corellation
