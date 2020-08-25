@@ -69,6 +69,20 @@ int main()
 
     cudaMemcpy(dev_a, x, len * sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(dev_b, y, len * sizeof(float), cudaMemcpyHostToDevice);
-    cudaMemcpy(dev_p_c, p_c, len * sizeof(float), cudaMemcpyHostToDevice);
+
+    dot<<<blocksPerGrid,threadsPerBlock>>>(dev_a,dev_b,dev_p_c);
+
+    cudaMemcpy(p_c, dev_p_c, blocksPerGrid * sizeof(float), cudaMemcpyDeviceToHost);
+    for (int i = 0; i < blocksPerGrid; i++)
+        c += p_c[i];
+
+
+    cudaFree(dev_a);
+    cudaFree(dev_b);
+    cudaFree(dev_p_c);
+
+    free(x);
+    free(y);
+    free(p_c);
     return 0;
 }
