@@ -1,6 +1,8 @@
 
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
+#include<chrono>
+#include<iostream>
 
 #pragma once
 #ifdef __INTELLISENSE__
@@ -12,7 +14,7 @@ void __syncthreads();
 #define imin(a,b) (a<b?a:b)
 
 const int threadsPerBlock = 256;
-const int len = 5;
+const int len = 33*1024;
 const int blocksPerGrid = imin(32, (len + threadsPerBlock - 1) / threadsPerBlock);
 
 __global__ void dot(float* a, float* b, float* c) {
@@ -58,6 +60,10 @@ int main()
     y[3] = 30.0;
     x[4] = 1.0;
     y[4] = 10.0;
+    /*for (int i = 0; i < len; i++) {
+        x[i] = i;
+        y[i] = i * 2;
+    }*/
     float c = 0.0;
     float* dev_a;
     float* dev_b;
@@ -70,13 +76,26 @@ int main()
     cudaMemcpy(dev_a, x, len * sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(dev_b, y, len * sizeof(float), cudaMemcpyHostToDevice);
 
+    auto start = std::chrono::steady_clock::now();
     dot<<<blocksPerGrid,threadsPerBlock>>>(dev_a,dev_b,dev_p_c);
-
+    auto end = std::chrono::steady_clock::now();
+    std::chrono::duration<double> elapsed = end - start;
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed);
+    std::cout << elapsed.count() << std::endl;
     cudaMemcpy(p_c, dev_p_c, blocksPerGrid * sizeof(float), cudaMemcpyDeviceToHost);
     for (int i = 0; i < blocksPerGrid; i++)
         c += p_c[i];
-
-
+    std::cout << c << std::endl;
+    start = std::chrono::steady_clock::now();
+    float z = 0.0f;
+    for (int i = 0; i < len; i++) {
+        z += (x[i] * y[i]);
+    }
+    end = std::chrono::steady_clock::now();
+    elapsed = end - start;
+    elapsed = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed);
+    std::cout << elapsed.count() << std::endl;
+    std::cout << z << std::endl;
     cudaFree(dev_a);
     cudaFree(dev_b);
     cudaFree(dev_p_c);
