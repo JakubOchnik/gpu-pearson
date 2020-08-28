@@ -1,4 +1,4 @@
-
+﻿
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
 #include<chrono>
@@ -17,7 +17,7 @@ const int threadsPerBlock = 256;
 const int len = 6;
 const int blocksPerGrid = imin(32, (len + threadsPerBlock - 1) / threadsPerBlock);
 
-__global__ void dot(PearsonArray mainArr, Components out) {
+__global__ void calculateComponents(PearsonArray mainArr, Components out) {
     __shared__ float cache[threadsPerBlock], cache_s1[threadsPerBlock], cache_s2[threadsPerBlock], cache_s3[threadsPerBlock], cache_s4[threadsPerBlock];
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
     int cacheIndex = threadIdx.x;
@@ -60,6 +60,33 @@ __global__ void dot(PearsonArray mainArr, Components out) {
     }
 }
 
+void sumOutboundArrays(Components* temps) {
+    for (int i = 0; i < blocksPerGrid; i++) {
+        temps->xy_res += temps->xy[i];
+        temps->x_sq_res += temps->x_sq[i];
+        temps->y_sq_res += temps->y_sq[i];
+        temps->x_res += temps->x[i];
+        temps->y_res += temps->y[i];
+    }
+}
+
+void printComponents(Components* temps) {
+    printf("(sigma)xi * yi = %f\n", temps->xy_res);
+    printf("(sigma)xi^2 = %f\n", temps->x_sq_res);
+    printf("(sigma)yi^2 = %f\n", temps->x_sq_res);
+    printf("(sigma)xi = %f\n", temps->x_res);
+    printf("(sigma)yi = %f\n", temps->y_res);
+}
+
+float substituteIntoFormula(Components* temps) {
+    float top = len * temps->xy_res - temps->x_res * temps->y_res;
+    float b1 = len * temps->x_sq_res - pow(temps->x_res, 2);
+    float b2 = len * temps->y_sq_res - pow(temps->y_res, 2);
+    float b_multi = b1 * b2;
+    float b_sq = sqrt(b_multi);
+    float result = top / b_sq;
+    return result;
+}
 
 int main()
 {
@@ -70,11 +97,6 @@ int main()
     PearsonArray p(x, y);
     //temporary sum handlers
     Components temps(len), d_temps(len);
-
-    /*for (int i = 0; i < len; i++) {
-        x[i] = i;
-        y[i] = i * 2;
-    }*/
 
     //device arrays for storing x,y values
     float* dev_a;
@@ -113,43 +135,28 @@ int main()
     d_temps.y_sq = dev_y_sq;
 
 
-    dot<<<blocksPerGrid,threadsPerBlock>>>(p,d_temps);
+    //execute the kernel
+    calculateComponents<<<blocksPerGrid,threadsPerBlock>>>(p,d_temps);
 
-
+    //copy arrays of equation components from device to host
     cudaMemcpy(temps.xy, dev_xy, blocksPerGrid * sizeof(float), cudaMemcpyDeviceToHost);
     cudaMemcpy(temps.x_sq, dev_x_sq, blocksPerGrid * sizeof(float), cudaMemcpyDeviceToHost);
     cudaMemcpy(temps.y_sq, dev_y_sq, blocksPerGrid * sizeof(float), cudaMemcpyDeviceToHost);
     cudaMemcpy(temps.x, dev_x, blocksPerGrid * sizeof(float), cudaMemcpyDeviceToHost);
     cudaMemcpy(temps.y, dev_y, blocksPerGrid * sizeof(float), cudaMemcpyDeviceToHost);
 
-    //sum all result arrays using CPU
-    for (int i = 0; i < blocksPerGrid; i++)
-        temps.xy_res += temps.xy[i];
-    for (int i = 0; i < blocksPerGrid; i++)
-        temps.x_sq_res += temps.x_sq[i];
-    for (int i = 0; i < blocksPerGrid; i++)
-        temps.y_sq_res += temps.y_sq[i];
-    for (int i = 0; i < blocksPerGrid; i++)
-        temps.x_res += temps.x[i];
-    for (int i = 0; i < blocksPerGrid; i++)
-        temps.y_res += temps.y[i];
+    //sum all reduced arrays using CPU
+    sumOutboundArrays(&temps);
 
+    //print values of components
+    //printComponents(&temps);
 
-    std::cout << temps.xy_res << std::endl;
-    std::cout << temps.x_sq_res << std::endl;
-    std::cout << temps.y_sq_res << std::endl;
-    std::cout << temps.x_res << std::endl;
-    std::cout << temps.y_res << std::endl;
+    //substitute all components into the final Pearson correlation coefficient formula
+    float result = substituteIntoFormula(&temps);
+    
+    printf("r = %f\n", result);
 
-    float top = len * temps.xy_res - temps.x_res * temps.y_res;
-    float b1 = len * temps.x_sq_res - pow(temps.x_res,2);
-    float b2 = len * temps.y_sq_res - pow(temps.y_res,2);
-    float b_multi = b1 * b2;
-    float b_sq = sqrt(b_multi);
-    float result = top / b_sq;
-    std::cout << result;
-
-
+    //free allocated memory
     cudaFree(dev_a);
     cudaFree(dev_b);
     cudaFree(dev_x);
