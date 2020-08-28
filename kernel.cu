@@ -4,55 +4,20 @@
 #include<chrono>
 #include<iostream>
 
-#pragma once
 #ifdef __INTELLISENSE__
 void __syncthreads();
 #endif
 #include <stdio.h>
 #include<stdlib.h>
+#include"structures.h"
 
 #define imin(a,b) (a<b?a:b)
 
 const int threadsPerBlock = 256;
-const int len = 5;
+const int len = 6;
 const int blocksPerGrid = imin(32, (len + threadsPerBlock - 1) / threadsPerBlock);
 
-typedef struct arr {
-    float* x;
-    float* y;
-    arr(float orig_x[], float orig_y[]) {
-        x = orig_x;
-        y = orig_y;
-    }
-}PearsonArray;
-
-typedef struct coeffs {
-    float* xy;
-    float* x_sq;
-    float* y_sq;
-    float* x;
-    float* y;
-    float xy_res;
-    float x_sq_res;
-    float y_sq_res;
-    float x_res;
-    float y_res;
-    coeffs() {
-        xy = (float*)malloc(len * sizeof(float));
-        x_sq = (float*)malloc(len * sizeof(float));
-        y_sq = (float*)malloc(len * sizeof(float));
-        x = (float*)malloc(len * sizeof(float));
-        y = (float*)malloc(len * sizeof(float));
-        xy_res = 0.0f;
-        x_sq_res = 0.0f;
-        y_sq_res = 0.0f;
-        x_res = 0.0f;
-        y_res = 0.0f;
-    }
-}sums;
-
-
-__global__ void dot(PearsonArray mainArr, sums out) {
+__global__ void dot(PearsonArray mainArr, Components out) {
     __shared__ float cache[threadsPerBlock], cache_s1[threadsPerBlock], cache_s2[threadsPerBlock], cache_s3[threadsPerBlock], cache_s4[threadsPerBlock];
     int tid = threadIdx.x + blockIdx.x * blockDim.x;
     int cacheIndex = threadIdx.x;
@@ -98,38 +63,35 @@ __global__ void dot(PearsonArray mainArr, sums out) {
 
 int main()
 {
-    float* x = (float*)malloc(len * sizeof(float));
-    float* y = (float*)malloc(len * sizeof(float));
-    x[0] = 3.0;
-    y[0] = 20.0;
-    x[1] = 3.0;
-    y[1] = 25.0;
-    x[2] = 2.0;
-    y[2] = 20.0;
-    x[3] = 4.0;
-    y[3] = 30.0;
-    x[4] = 1.0;
-    y[4] = 10.0;
+    //main array of function's points
+    float x[len] = { 43.0,21.0,25.0,42.0,57.0,59.0 };
+    float y[len] = { 99.0,65.0,79.0,75.0,87.0,81.0 };
+    //structure with points
     PearsonArray p(x, y);
-    sums temps, d_temps;
+    //temporary sum handlers
+    Components temps(len), d_temps(len);
+
     /*for (int i = 0; i < len; i++) {
         x[i] = i;
         y[i] = i * 2;
     }*/
-    //array ->x,y
+
+    //device arrays for storing x,y values
     float* dev_a;
     float* dev_b;
-    // temp arrays -> xy, x^2, y^2, x, y
+    // device arrays for sums xy, x^2, y^2, x, y
     float* dev_xy;
     float* dev_x_sq;
     float* dev_y_sq;
     float* dev_x;
     float* dev_y;
 
+    // -- memory allocation --
+
     //mainArr, x, y
     cudaMalloc((void**)&dev_a, len * sizeof(float));
     cudaMalloc((void**)&dev_b, len * sizeof(float));
-    //alloc all out arrays
+    //alloc all outbound arrays
     cudaMalloc((void**)&dev_xy, blocksPerGrid * sizeof(float));
     cudaMalloc((void**)&dev_x_sq, blocksPerGrid * sizeof(float));
     cudaMalloc((void**)&dev_y_sq, blocksPerGrid * sizeof(float));
@@ -160,6 +122,7 @@ int main()
     cudaMemcpy(temps.x, dev_x, blocksPerGrid * sizeof(float), cudaMemcpyDeviceToHost);
     cudaMemcpy(temps.y, dev_y, blocksPerGrid * sizeof(float), cudaMemcpyDeviceToHost);
 
+    //sum all result arrays using CPU
     for (int i = 0; i < blocksPerGrid; i++)
         temps.xy_res += temps.xy[i];
     for (int i = 0; i < blocksPerGrid; i++)
@@ -194,6 +157,8 @@ int main()
     cudaFree(dev_xy);
     cudaFree(dev_x_sq);
     cudaFree(dev_y_sq);
+
+    temps.freeMem();
 
     return 0;
 }
