@@ -1,21 +1,22 @@
 ﻿
 #include "cuda_runtime.h"
 #include "device_launch_parameters.h"
-#include<chrono>
-#include<iostream>
+#include <stdio.h>
+#include <stdlib.h>
+#include <math.h>
+#include"structures.h"
+
+#define PRINT_COMPONENTS true
+//NUMBER OF (X,Y) POINTS
+const int len = 6;
+
+#define imin(a,b) (a<b?a:b)
+const int threadsPerBlock = 256;
+const int blocksPerGrid = imin(32, (len + threadsPerBlock - 1) / threadsPerBlock);
 
 #ifdef __INTELLISENSE__
 void __syncthreads();
 #endif
-#include <stdio.h>
-#include<stdlib.h>
-#include"structures.h"
-
-#define imin(a,b) (a<b?a:b)
-
-const int threadsPerBlock = 256;
-const int len = 6;
-const int blocksPerGrid = imin(32, (len + threadsPerBlock - 1) / threadsPerBlock);
 
 __global__ void calculateComponents(PearsonArray mainArr, Components out) {
     __shared__ float cache[threadsPerBlock], cache_s1[threadsPerBlock], cache_s2[threadsPerBlock], cache_s3[threadsPerBlock], cache_s4[threadsPerBlock];
@@ -113,7 +114,7 @@ int main()
     //mainArr, x, y
     cudaMalloc((void**)&dev_a, len * sizeof(float));
     cudaMalloc((void**)&dev_b, len * sizeof(float));
-    //alloc all outbound arrays
+    //allocate all outbound arrays
     cudaMalloc((void**)&dev_xy, blocksPerGrid * sizeof(float));
     cudaMalloc((void**)&dev_x_sq, blocksPerGrid * sizeof(float));
     cudaMalloc((void**)&dev_y_sq, blocksPerGrid * sizeof(float));
@@ -149,7 +150,9 @@ int main()
     sumOutboundArrays(&temps);
 
     //print values of components
-    //printComponents(&temps);
+#if PRINT_COMPONENTS
+    printComponents(&temps);
+#endif
 
     //substitute all components into the final Pearson correlation coefficient formula
     float result = substituteIntoFormula(&temps);
