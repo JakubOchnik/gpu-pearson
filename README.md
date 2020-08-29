@@ -7,7 +7,7 @@ The domain of this function is <-1, 1>, where:
 - 0 indicates no correlation
 - -1 indicates a negative correlation
 ## Formula
-A mathematical formula used to calculate the coefficient:
+A mathematical formula used to calculate the coefficient:<br/>
 ![Pearson corr formula](https://wikimedia.org/api/rest_v1/media/math/render/svg/435a23c499a2450f0752112e69a9b808336a7cce)
 *Image courtesy of Wikipedia*
 ## How does the program work?
