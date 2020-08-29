@@ -15,7 +15,6 @@ The program calculates in parallel each of the components of above formula.
 Every sum is calculated and reduced using GPU. This is the most time-demanding process and it's easy to make it parallel. Then, CPU performs a "finishing" process (summing output values of every GPU block) and substitutes every component into the final formula.
 ## Example
 ### Input
-```
 | X  | Y  |
 | -- | -- |
 | 43 | 99 |
@@ -24,7 +23,6 @@ Every sum is calculated and reduced using GPU. This is the most time-demanding p
 | 42 | 75 |
 | 57 | 87 |
 | 59 | 81 |
-```
 ### Output
 ```
 (sigma)xi * yi = 20485.000000
