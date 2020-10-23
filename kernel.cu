@@ -4,19 +4,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
-#include"structures.h"
 
-#define PRINT_COMPONENTS true
-//NUMBER OF (X,Y) POINTS
-const int len = 6;
-
-#define imin(a,b) (a<b?a:b)
-const int threadsPerBlock = 256;
-const int blocksPerGrid = imin(32, (len + threadsPerBlock - 1) / threadsPerBlock);
-
-#ifdef __INTELLISENSE__
-void __syncthreads();
-#endif
+#include "utils.h"
+#include "parameters.h"
+#include "pearsonCorellation.h"
 
 __global__ void calculateComponents(PearsonArray mainArr, Components out) {
     __shared__ float cache[threadsPerBlock], cache_s1[threadsPerBlock], cache_s2[threadsPerBlock], cache_s3[threadsPerBlock], cache_s4[threadsPerBlock];
@@ -61,39 +52,8 @@ __global__ void calculateComponents(PearsonArray mainArr, Components out) {
     }
 }
 
-void sumOutboundArrays(Components* temps) {
-    for (int i = 0; i < blocksPerGrid; i++) {
-        temps->xy_res += temps->xy[i];
-        temps->x_sq_res += temps->x_sq[i];
-        temps->y_sq_res += temps->y_sq[i];
-        temps->x_res += temps->x[i];
-        temps->y_res += temps->y[i];
-    }
-}
-
-void printComponents(Components* temps) {
-    printf("(sigma)xi * yi = %f\n", temps->xy_res);
-    printf("(sigma)xi^2 = %f\n", temps->x_sq_res);
-    printf("(sigma)yi^2 = %f\n", temps->x_sq_res);
-    printf("(sigma)xi = %f\n", temps->x_res);
-    printf("(sigma)yi = %f\n", temps->y_res);
-}
-
-float substituteIntoFormula(Components* temps) {
-    float top = len * temps->xy_res - temps->x_res * temps->y_res;
-    float b1 = len * temps->x_sq_res - pow(temps->x_res, 2);
-    float b2 = len * temps->y_sq_res - pow(temps->y_res, 2);
-    float b_multi = b1 * b2;
-    float b_sq = sqrt(b_multi);
-    float result = top / b_sq;
-    return result;
-}
-
-int main()
+float pearsonCorellation(const float* x, const float* y)
 {
-    //main array of function's points
-    float x[len] = { 43.0,21.0,25.0,42.0,57.0,59.0 };
-    float y[len] = { 99.0,65.0,79.0,75.0,87.0,81.0 };
     //structure with points
     PearsonArray p(x, y);
     //temporary sum handlers
@@ -121,8 +81,6 @@ int main()
     cudaMalloc((void**)&dev_x, blocksPerGrid * sizeof(float));
     cudaMalloc((void**)&dev_y, blocksPerGrid * sizeof(float));
 
-
-
     //copy mainArr to kernel
     cudaMemcpy(dev_a, x, len * sizeof(float), cudaMemcpyHostToDevice);
     cudaMemcpy(dev_b, y, len * sizeof(float), cudaMemcpyHostToDevice);
@@ -134,7 +92,6 @@ int main()
     d_temps.y = dev_y;
     d_temps.x_sq = dev_x_sq;
     d_temps.y_sq = dev_y_sq;
-
 
     //execute the kernel
     calculateComponents<<<blocksPerGrid,threadsPerBlock>>>(p,d_temps);
@@ -157,8 +114,6 @@ int main()
     //substitute all components into the final Pearson correlation coefficient formula
     float result = substituteIntoFormula(&temps);
     
-    printf("r = %f\n", result);
-
     //free allocated memory
     cudaFree(dev_a);
     cudaFree(dev_b);
@@ -170,5 +125,5 @@ int main()
 
     temps.freeMem();
 
-    return 0;
+    return result;
 }

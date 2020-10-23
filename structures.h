@@ -1,9 +1,9 @@
 #pragma once
 #include<stdlib.h>
 typedef struct arr {
-    float* x;
-    float* y;
-    arr(float orig_x[], float orig_y[]) {
+    const float* x;
+    const float* y;
+    arr(const float orig_x[], const float orig_y[]) {
         x = orig_x;
         y = orig_y;
     }
